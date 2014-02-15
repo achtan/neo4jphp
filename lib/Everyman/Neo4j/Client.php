@@ -329,15 +329,14 @@ class Client
 			return $cached;
 		}
 
-		$node = $this->makeNode();
-		$node->setId($id);
-
 		if ($force) {
+			$node = $this->makeNode();
+			$node->setId($id);
 			return $node;
 		}
 
 		try {
-			$result = $this->loadNode($node);
+			$node = $this->runCommand(new Command\GetNode($this, $id));
 		} catch (Exception $e) {
 			if ($e->getCode() == self::ErrorNotFound) {
 				return null;

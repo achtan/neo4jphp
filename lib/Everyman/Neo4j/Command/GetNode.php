@@ -12,17 +12,23 @@ use Everyman\Neo4j\Command,
 class GetNode extends Command
 {
 	protected $node = null;
+	protected $nodeId = null;
 
 	/**
 	 * Set the node to drive the command
 	 *
 	 * @param Client $client
-	 * @param Node $node
+	 * @param Node|int $nodeOrId
 	 */
-	public function __construct(Client $client, Node $node)
+	public function __construct(Client $client, $nodeOrId)
 	{
 		parent::__construct($client);
-		$this->node = $node;
+		if($nodeOrId instanceof Node) {
+			$this->node = $nodeOrId;
+			$nodeOrId->hasId() && $this->nodeId = $nodeOrId->getId();
+		} else {
+			$this->nodeId = $nodeOrId;
+		}
 	}
 
 	/**
@@ -52,10 +58,12 @@ class GetNode extends Command
 	 */
 	protected function getPath()
 	{
-		if (!$this->node->hasId()) {
+		if($this->nodeId === NULL) {
 			throw new Exception('No node id specified');
 		}
-		return '/node/'.$this->node->getId();
+
+		return '/node/'.$this->nodeId;
+
 	}
 
 	/**
@@ -70,9 +78,22 @@ class GetNode extends Command
 	protected function handleResult($code, $headers, $data)
 	{
 		if ((int)($code / 100) == 2) {
-			$this->node = $this->getEntityMapper()->populateNode($this->node, $data);
-			$this->getEntityCache()->setCachedEntity($this->node);
-			return true;
+			if($this->node) {
+				$node = $this->node;
+			} else {
+				$node = $this->client->makeNode($data['data']);
+				$node->setId($this->nodeId);
+			}
+
+			$node = $this->getEntityMapper()->populateNode($node, $data);
+			$this->getEntityCache()->setCachedEntity($node);
+
+			if($this->node) {
+				$this->node = $node;
+				return true;
+			} else {
+				return $node;
+			}
 		} else {
 			$this->throwException('Unable to retrieve node', $code, $headers, $data);
 		}
